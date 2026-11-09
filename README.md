@@ -1,292 +1,148 @@
-# Flux
+<p align="center">
+  <img src="docs/readme/banner.svg" width="100%" alt="Flux: a graph of file formats with a route lit from markdown through docx to pdf.">
+</p>
 
-Flux is a cross-platform CLI for converting files across formats with a practical engine-first pipeline:
+<p align="center">
+  <b>One command converts anything to anything. It plans the route, picks the engine, and tells you why.</b><br>
+  <sub>A cross-platform conversion CLI and Go library that puts Pandoc, FFmpeg, ImageMagick, high-fidelity PDF and DOCX adapters, and a native data engine behind one predictable interface.</sub>
+</p>
 
-- Documents: Pandoc
-- Images: ImageMagick
-- Audio/Video: FFmpeg
-- Structured data (CSV/JSON/YAML/TOML): native Go engine
-- High-fidelity PDF/DOCX: Python adapters (`pdf2docx`, `docx2pdf`)
+<p align="center">
+  <sub>
+    <a href="#overview">OVERVIEW</a> &nbsp;·&nbsp;
+    <a href="#quick-start">QUICK START</a> &nbsp;·&nbsp;
+    <a href="#the-engines">THE ENGINES</a> &nbsp;·&nbsp;
+    <a href="#route-planning">ROUTE PLANNING</a> &nbsp;·&nbsp;
+    <a href="#install">INSTALL</a> &nbsp;·&nbsp;
+    <a href="#use-it">USE IT</a> &nbsp;·&nbsp;
+    <a href="#as-a-library">AS A LIBRARY</a>
+  </sub>
+</p>
 
-Flux is designed for developer workflows: simple commands, predictable output, and explicit fallback behavior.
+<br>
 
-## Features
+<table>
+  <tr>
+    <td><sub>LANGUAGE</sub><br><b>Go</b></td>
+    <td><sub>PLATFORMS</sub><br><b>macOS · Linux · Windows</b></td>
+    <td><sub>ENGINES</sub><br><b>5</b></td>
+    <td><sub>PIPES</sub><br><b>stdin → stdout</b></td>
+    <td><sub>ALSO</sub><br><b>Go SDK, <code>pkg/flux</code></b></td>
+  </tr>
+</table>
 
-- One-command setup on macOS/Linux and Windows
-- Global install option (`go install`)
-- Smart route planning (`--engine auto`) with direct conversions preferred
-- Explicit engine forcing (`--engine pandoc`, `--engine ffmpeg`, etc.)
-- Batch conversion and glob support
-- Stdin/stdout pipe support for data workflows
-- DOCX style preservation via `--reference-doc`
-- Developer-friendly markdown formatting profile (`--format-style developer`)
-- Built-in diagnostics via `flux doctor`
-- Public Go library package at `pkg/flux`
+## Overview
 
-## Quick Start
+Flux converts documents, images, audio, video and data through one predictable command. It does not reinvent conversion: it knows which proven tool should handle each job, plans the route, and tells you what it used.
 
-### Option A: One-command local setup (recommended)
+> [!NOTE]
+> Forcing an engine is strict: `--engine pandoc` means Pandoc, or an error that says what to install. Never a silent substitute.
 
-macOS/Linux:
+## Quick start
+
+```bash
+go install github.com/kelyonn/flux@latest
+flux notes.md pdf
+flux doctor          # which engines are installed
+```
+
+## How a conversion is planned
+
+```mermaid
+flowchart LR
+    in(["input + target"]) --> plan{"--engine auto"}
+    plan -- "documents" --> pandoc["Pandoc"]
+    plan -- "images" --> im["ImageMagick"]
+    plan -- "audio / video" --> ff["FFmpeg"]
+    plan -- "pdf ↔ docx" --> py["pdf2docx · docx2pdf"]
+    plan -- "json · yaml · toml · csv" --> go["native Go"]
+    pandoc & im & ff & py & go --> out(["output"])
+```
+
+
+## The engines
+
+Flux does not reimplement conversion. It decides which proven tool should do it.
+
+| Kind | Engine | Examples |
+|---|---|---|
+| Documents | Pandoc | `md → pdf`, `md → docx`, `html → epub` |
+| Images | ImageMagick | `png → jpg`, `jpg → webp` |
+| Audio and video | FFmpeg | `mov → mp4`, `mp4 → webm` |
+| Structured data | native Go | `json ↔ yaml ↔ toml ↔ csv` |
+| PDF and DOCX, high fidelity | Python adapters | `pdf2docx`, `docx2pdf` |
+
+## Route planning
+
+With `--engine auto` (the default) Flux plans a route from the source format to the target. It prefers a direct, high-fidelity conversion and only chains steps when it has to.
+
+The rules are written down rather than implied:
+
+- **Auto prefers fidelity.** `pdf → docx` goes through `pdf2docx`; `docx → pdf` prefers `docx2pdf` and falls back only if that runtime fails.
+- **Forcing an engine is strict.** `--engine pandoc` means Pandoc or an error that says what to install. Never a silent substitute.
+- **Fallbacks are explicit.** They are defined per route, not improvised, and a fallback on a complex PDF may cost layout fidelity.
+- **`flux doctor` tells the truth** about which engines are installed and which versions.
 
 ```sh
-make setup
-flux --help
+flux convert -i report.docx -o report.pdf --engine auto      # plan it
+flux convert -i notes.md -o notes.pdf --engine pandoc        # insist on it
 ```
 
-Windows PowerShell:
+## Install
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -Yes
-flux --help
-```
-
-Setup performs:
-
-1. Runtime dependency install (non-interactive)
-2. Python `.venv` bootstrap
-3. Python module install (`pdf2docx`, `docx2pdf`)
-4. `FLUX_PYTHON` persistence
-5. Build + install
-6. Health verification with `flux doctor`
-
-### Option B: Global install (Go toolchain path)
-
-macOS/Linux:
+**One command** installs the runtime engines, a Python environment for the adapters, the binary, and then checks itself:
 
 ```sh
-./scripts/install-go.sh
+make setup                                                           # macOS, Linux
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1 -Yes    # Windows
 ```
 
-Windows PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-go.ps1
-```
-
-This installs `github.com/kelyonn/flux` via `go install` and updates user PATH if required.
-
-Manual global install command:
+Or just the binary, with Go:
 
 ```sh
 go install github.com/kelyonn/flux@latest
 ```
 
-## Core Commands
-
-- `flux convert` - convert files
-- `flux doctor` - check engine availability and versions
-- `flux list-formats` - show format support by engine
-- `flux info <file>` - inspect file metadata
-
-Aliases:
-
-- `flux c` -> `flux convert`
-- `flux d` -> `flux doctor`
-- `flux lf` -> `flux list-formats`
-- `flux i` -> `flux info`
-
-## Usage
-
-### Short syntax
-
-```sh
-flux input.jpg png
-flux docs/guide.md pdf
-flux media/clip.mov mp4
-```
-
-### Explicit syntax
-
-```sh
-flux convert input.jpg png
-flux convert notes.md pdf
-flux convert input.mp4 webm
-```
-
-### Data conversion
-
-```sh
-flux convert -i data.json -o data.yaml
-flux convert -i sheet.csv -o sheet.json
-flux convert -i config.toml -o config.yaml --from toml --to yaml
-```
-
-### Batch conversion
-
-```sh
-flux convert -i a.jpg b.jpg c.jpg -o png
-flux convert -i *.json -o yaml --force
-```
-
-### Pipe support (stdin/stdout)
-
-```sh
-cat file.json | flux convert -o - --from json --to yaml > out.yaml
-```
-
-## Engine Selection
-
-Default behavior uses route planning:
-
-```sh
-flux convert -i input.docx -o output.pdf --engine auto
-```
-
-Force a specific engine:
-
-```sh
-flux convert -i file.pdf -o file.docx --engine pdf2docx
-flux convert -i file.docx -o file.pdf --engine docx2pdf
-flux convert -i file.md -o file.pdf --engine pandoc
-flux convert -i file.png -o file.jpg --engine imagemagick
-flux convert -i file.mp4 -o file.webm --engine ffmpeg
-flux convert -i file.json -o file.csv --engine data
-```
-
-Important behavior:
-
-- `--engine auto` prefers direct, high-fidelity routes.
-- Forced engines are strict. If forced engine cannot complete the route, Flux returns an actionable error.
-- `pdf -> docx` in auto mode expects Python adapter availability for best fidelity.
-- `docx -> pdf` in auto mode prefers `docx2pdf` and can fallback when runtime issues occur.
-
-## PDF <-> DOCX Pipeline
-
-Flux prioritizes Python adapters for document fidelity:
-
-- `pdf2docx` for `pdf -> docx`
-- `docx2pdf` for `docx -> pdf`
-
-If modules are missing, fallback paths can be used in some cases, but may lose layout fidelity for complex PDFs.
-
-Install modules manually (if needed):
-
-```sh
-pip install pdf2docx docx2pdf
-```
-
-## Document Formatting
-
-Flux preserves source structure by default and avoids synthetic section generation.
-
-### Style presets
-
-- `professional` (default)
-- `technical`
-- `developer`
-- `none`
-
-Examples:
-
-```sh
-flux convert -i notes.md -o notes.pdf --engine pandoc --format-style professional
-flux convert -i notes.md -o notes.pdf --engine pandoc --format-style technical
-flux convert -i notes.md -o notes.pdf --engine pandoc --format-style developer
-flux convert -i notes.md -o notes.html --engine pandoc --format-style none
-```
-
-### DOCX style preservation and templates
-
-Use DOCX templates for consistent Word styling:
-
-```sh
-flux convert -i notes.md -o notes.docx --reference-doc template.docx --format-style professional
-```
-
-If input and output are both DOCX, Flux can reuse input styling as reference automatically.
-
-## Build and Install
-
-```sh
-make build
-make install
-```
-
-Default install targets:
-
-1. Apple Silicon macOS: `/opt/homebrew/bin`
-2. Other systems: `/usr/local/bin`
-
-Override destination:
-
-```sh
-make install BINDIR=$HOME/.local/bin
-```
-
-## Developer Setup
-
-Python runtime bootstrap helpers:
-
-```sh
-make bootstrap
-make bootstrap-check
-make dev-ready
-```
-
-`make install` enforces bootstrap checks so local installs remain conversion-ready.
-
-## Terminal UX
-
-- Disable animated UI: `--no-ui`
-- Disable ANSI colors: `--no-color` or `NO_COLOR=1`
-
-Examples:
-
-```sh
-flux doctor
-flux --no-ui doctor
-NO_COLOR=1 flux doctor
-```
-
-## Go Library
-
-Install:
-
-```sh
-go get github.com/kelyonn/flux/pkg/flux@latest
-```
-
-Example:
-
-```go
-package main
-
-import (
-	"context"
-	"log"
-
-	fluxlib "github.com/kelyonn/flux/pkg/flux"
-)
-
-func main() {
-	ctx := context.Background()
-
-	if _, err := fluxlib.EnsureDependencies(ctx, true); err != nil {
-		log.Fatalf("dependency setup failed: %v", err)
-	}
-
-	err := fluxlib.Convert("README.md", "README.html", fluxlib.ConvertOptions{
-		Engine:      "auto",
-		FormatStyle: "professional",
-	})
-	if err != nil {
-		log.Fatalf("convert failed: %v", err)
-	}
-}
-```
-
-## Docker
+Or in a container:
 
 ```sh
 docker build -t flux .
 docker run --rm flux convert -i input.json -o output.yaml
 ```
 
-## Requirements and Compatibility
+## Use it
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for full dependency matrix and platform-specific verification details.
+```sh
+flux input.jpg png                          # short form
+flux docs/guide.md pdf
+flux convert -i *.json -o yaml --force      # batch, with globs
+flux convert -i sheet.csv -o sheet.json
+cat data.json | flux convert -o - --from json --to yaml > out.yaml
+```
 
-## License
+| Command | Alias | |
+|---|---|---|
+| `flux convert` | `c` | convert files |
+| `flux doctor` | `d` | engine availability and versions |
+| `flux list-formats` | `lf` | what each engine supports |
+| `flux info <file>` | `i` | inspect a file |
 
-MIT License. See [LICENSE](LICENSE).
+**Documents keep their structure.** Flux never invents sections. Style presets (`professional` by default, `developer` for markdown) and `--reference-doc` carry your own DOCX styling through a conversion.
+
+## As a library
+
+```go
+import fluxlib "github.com/kelyonn/flux/pkg/flux"
+
+if _, err := fluxlib.EnsureDependencies(ctx, true); err != nil {
+    log.Fatal(err)
+}
+err := fluxlib.Convert("README.md", "README.html", fluxlib.ConvertOptions{
+    Engine:      "auto",
+    FormatStyle: "professional",
+})
+```
+
+Full dependency and platform matrix: [REQUIREMENTS.md](REQUIREMENTS.md).
+
+<sub>MIT.</sub>
